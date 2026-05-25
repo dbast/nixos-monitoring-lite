@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended",
     "customManagers:githubActionsVersions",
-    "helpers:pinGitHubActionDigestsToSemver"
+    "helpers:pinGitHubActionDigests"
   ],
   "lockFileMaintenance": {
     "enabled": true

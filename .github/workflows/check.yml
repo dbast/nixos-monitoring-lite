@@ -1,0 +1,33 @@
+name: check
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      NIXPKGS_REF: nixos-25.11
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - name: treefmt
+        run: |
+          nix shell \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#treefmt \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#nixfmt \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#deadnix \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#shfmt \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#shellcheck \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#yamlfmt \
+            github:NixOS/nixpkgs/${NIXPKGS_REF}#typos \
+            -c treefmt --ci
+  flake-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - name: nix flake check
+        run: nix flake check --print-build-logs
+      - name: evaluate all systems
+        run: nix flake check --all-systems --no-build --print-build-logs

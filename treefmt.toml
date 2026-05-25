@@ -1,0 +1,28 @@
+on-unmatched = "info"
+
+[formatter.nix]
+command = "nixfmt"
+includes = ["*.nix"]
+
+[formatter.deadnix]
+command = "deadnix"
+options = ["--fail"]
+includes = ["*.nix"]
+
+[formatter.sh]
+command = "shfmt"
+options = ["-w", "-s"]
+includes = ["*.sh"]
+
+[formatter.shellcheck]
+command = "shellcheck"
+options = ["--severity", "warning"]
+includes = ["*.sh"]
+
+[formatter.yaml]
+command = "yamlfmt"
+includes = ["*.yml", "*.yaml"]
+
+[formatter.typos]
+command = "typos"
+includes = ["*"]
