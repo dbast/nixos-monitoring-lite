@@ -67,20 +67,20 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
       modules = [
         nixos-monitoring-lite.nixosModules.default
         {
-          services.healthchecksLite.canary = {
+          services.monitoringLite.canary = {
             enable = true;
             urlFile = "/run/secrets/healthchecks/canary.url";
             disks = [ "/" "/data" ];
             threshold = 80;
           };
 
-          services.healthchecksLite.systemdFail = {
+          services.monitoringLite.systemdFail = {
             enable = true;
             urlFile = "/run/secrets/healthchecks/systemd-failure.url";
             services = [ "backup" "syncthing" ];
           };
 
-          services.healthchecksLite.smartd = {
+          services.monitoringLite.smartd = {
             enable = true;
             urlFile = "/run/secrets/healthchecks/smartd.url";
             shortSelfTest = {
@@ -111,7 +111,7 @@ Enable the built-in demo failing service:
 
 ```nix
 {
-  services.healthchecksLite.systemdFail = {
+  services.monitoringLite.systemdFail = {
     enable = true;
     enableDemo = true;
     urlFile = "/run/secrets/healthchecks/systemd-failure.url";
@@ -122,7 +122,7 @@ Enable the built-in demo failing service:
 Trigger a failure event:
 
 ```sh
-sudo systemctl start healthchecks-lite-fail-demo.service
+sudo systemctl start monitoring-lite-fail-demo.service
 ```
 
 That runs the same `OnFailure` path used by real monitored services.
@@ -133,7 +133,7 @@ Enable SMART test mode:
 
 ```nix
 {
-  services.healthchecksLite.smartd = {
+  services.monitoringLite.smartd = {
     enable = true;
     testMode = true;
     urlFile = "/run/secrets/healthchecks/smartd.url";
@@ -144,7 +144,7 @@ Enable SMART test mode:
 `testMode` adds `-M test` to `smartd` and enables a deterministic synthetic alert service:
 
 ```sh
-sudo systemctl start healthchecks-lite-smartd-test-alert.service
+sudo systemctl start monitoring-lite-smartd-test-alert.service
 ```
 
 ### Mark Green After Tests Or Fixes
@@ -155,14 +155,14 @@ Healthchecks.io checks that receive `/fail` stay red until a normal ping is sent
 - `systemdFail` and `smartd` include manual recovery services.
 
 ```sh
-sudo systemctl start healthchecks-lite-systemd-fail-ok.service
-sudo systemctl start healthchecks-lite-smartd-ok.service
+sudo systemctl start monitoring-lite-systemd-fail-ok.service
+sudo systemctl start monitoring-lite-smartd-ok.service
 ```
 
 Customize the recovery payload text with:
 
-- `services.healthchecksLite.systemdFail.okMessage`
-- `services.healthchecksLite.smartd.okMessage`
+- `services.monitoringLite.systemdFail.okMessage`
+- `services.monitoringLite.smartd.okMessage`
 
 ## SMART Self-Tests
 
@@ -178,9 +178,9 @@ Proxying is generic and optional. Point each module at any proxy URL:
 
 ```nix
 {
-  services.healthchecksLite.canary.proxy = "http://proxy.example:3128";
-  services.healthchecksLite.systemdFail.proxy = "http://proxy.example:3128";
-  services.healthchecksLite.smartd.proxy = "http://proxy.example:3128";
+  services.monitoringLite.canary.proxy = "http://proxy.example:3128";
+  services.monitoringLite.systemdFail.proxy = "http://proxy.example:3128";
+  services.monitoringLite.smartd.proxy = "http://proxy.example:3128";
 }
 ```
 

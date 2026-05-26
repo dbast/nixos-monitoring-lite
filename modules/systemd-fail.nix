@@ -6,13 +6,13 @@
 }:
 
 let
-  cfg = config.services.healthchecksLite.systemdFail;
+  cfg = config.services.monitoringLite.systemdFail;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
   proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
 in
 {
-  options.services.healthchecksLite.systemdFail = {
-    enable = lib.mkEnableOption "Healthchecks systemd failure notifications";
+  options.services.monitoringLite.systemdFail = {
+    enable = lib.mkEnableOption "systemd failure notifications";
 
     urlFile = lib.mkOption {
       type = lib.types.str;
@@ -67,8 +67,8 @@ in
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
       {
-        systemd.services."healthchecks-lite-fail@" = {
-          description = "Send Healthchecks failure notification for %I";
+        systemd.services."monitoring-lite-fail@" = {
+          description = "Send monitoring failure notification for %I";
           after = [ "network-online.target" ];
           wants = [ "network-online.target" ];
           serviceConfig = {
@@ -107,7 +107,7 @@ in
           '';
         };
 
-        systemd.services.healthchecks-lite-systemd-fail-ok = {
+        systemd.services.monitoring-lite-systemd-fail-ok = {
           description = "Mark Healthchecks systemd-fail check as recovered";
           after = [ "network-online.target" ];
           wants = [ "network-online.target" ];
@@ -135,17 +135,17 @@ in
       }
       {
         systemd.services = lib.genAttrs cfg.services (_name: {
-          unitConfig.OnFailure = [ "healthchecks-lite-fail@%n.service" ];
+          unitConfig.OnFailure = [ "monitoring-lite-fail@%n.service" ];
         });
       }
       (lib.mkIf cfg.enableDemo {
-        systemd.services.healthchecks-lite-fail-demo = {
+        systemd.services.monitoring-lite-fail-demo = {
           description = "Intentional failing demo service";
           serviceConfig = {
             Type = "oneshot";
             ExecStart = "${pkgs.coreutils}/bin/false";
           };
-          unitConfig.OnFailure = [ "healthchecks-lite-fail@%n.service" ];
+          unitConfig.OnFailure = [ "monitoring-lite-fail@%n.service" ];
         };
       })
     ]

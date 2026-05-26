@@ -6,7 +6,7 @@
 }:
 
 let
-  cfg = config.services.healthchecksLite.canary;
+  cfg = config.services.monitoringLite.canary;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
   btrfsMounts = lib.attrNames (
     lib.filterAttrs (_: fs: fs.fsType or null == "btrfs") config.fileSystems
@@ -14,8 +14,8 @@ let
   proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
 in
 {
-  options.services.healthchecksLite.canary = {
-    enable = lib.mkEnableOption "Healthchecks canary heartbeat";
+  options.services.monitoringLite.canary = {
+    enable = lib.mkEnableOption "monitoring canary heartbeat";
 
     disks = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -56,8 +56,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.services.healthchecks-lite-canary = {
-      description = "Healthchecks canary heartbeat";
+    systemd.services.monitoring-lite-canary = {
+      description = "Monitoring canary heartbeat";
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
       serviceConfig = {
@@ -180,8 +180,8 @@ in
       '';
     };
 
-    systemd.timers.healthchecks-lite-canary = {
-      description = "Run Healthchecks canary heartbeat daily";
+    systemd.timers.monitoring-lite-canary = {
+      description = "Run monitoring canary heartbeat daily";
       wantedBy = [ "timers.target" ];
       timerConfig = {
         OnBootSec = "2m";

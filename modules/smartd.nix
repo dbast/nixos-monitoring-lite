@@ -6,10 +6,10 @@
 }:
 
 let
-  cfg = config.services.healthchecksLite.smartd;
+  cfg = config.services.monitoringLite.smartd;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
   proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
-  smartdHook = pkgs.writeShellScript "smartd-healthchecks-lite.sh" ''
+  smartdHook = pkgs.writeShellScript "smartd-monitoring-lite.sh" ''
     set -euo pipefail
     msg="SMARTD_DEVICE=$SMARTD_DEVICE
     SMARTD_FAILTYPE=$SMARTD_FAILTYPE
@@ -25,7 +25,7 @@ let
       ${proxyArg}
   '';
   shortSelfTestServices = lib.optionalAttrs cfg.shortSelfTest.enable {
-    healthchecks-lite-smartd-short-self-test = {
+    monitoring-lite-smartd-short-self-test = {
       description = "Run SMART short self-tests without waking standby disks";
       path = [ pkgs.smartmontools ];
       serviceConfig.Type = "oneshot";
@@ -65,13 +65,13 @@ let
   };
   shortSelfTestTriggers = lib.optionalAttrs cfg.shortSelfTest.enable (
     lib.genAttrs cfg.shortSelfTest.triggerAfterUnits (_name: {
-      unitConfig.OnSuccess = [ "healthchecks-lite-smartd-short-self-test.service" ];
+      unitConfig.OnSuccess = [ "monitoring-lite-smartd-short-self-test.service" ];
     })
   );
   shortSelfTestTimers =
     lib.optionalAttrs (cfg.shortSelfTest.enable && cfg.shortSelfTest.onCalendar != null)
       {
-        healthchecks-lite-smartd-short-self-test = {
+        monitoring-lite-smartd-short-self-test = {
           description = "Run SMART short self-tests";
           wantedBy = [ "timers.target" ];
           timerConfig = {
@@ -82,8 +82,8 @@ let
       };
 in
 {
-  options.services.healthchecksLite.smartd = {
-    enable = lib.mkEnableOption "Healthchecks SMART disk monitor";
+  options.services.monitoringLite.smartd = {
+    enable = lib.mkEnableOption "SMART disk monitor";
 
     urlFile = lib.mkOption {
       type = lib.types.str;
@@ -159,7 +159,7 @@ in
       shortSelfTestServices
       // shortSelfTestTriggers
       // {
-        healthchecks-lite-smartd-ok = {
+        monitoring-lite-smartd-ok = {
           description = "Mark Healthchecks SMART check as recovered";
           after = [ "network-online.target" ];
           wants = [ "network-online.target" ];
@@ -181,7 +181,7 @@ in
             ${proxyArg}
           '';
         };
-        healthchecks-lite-smartd-test-alert = lib.mkIf cfg.testMode {
+        monitoring-lite-smartd-test-alert = lib.mkIf cfg.testMode {
           description = "Send a synthetic Healthchecks SMART failure test alert";
           after = [ "network-online.target" ];
           wants = [ "network-online.target" ];
@@ -191,7 +191,7 @@ in
               "SMARTD_DEVICE=/dev/test"
               "SMARTD_FAILTYPE=EmailTest"
               "SMARTD_MESSAGE=synthetic smartd test alert"
-              "SMARTD_FULLMESSAGE=synthetic smartd test alert from healthchecks-lite-smartd-test-alert"
+              "SMARTD_FULLMESSAGE=synthetic smartd test alert from monitoring-lite-smartd-test-alert"
             ];
             ExecStart = smartdHook;
           };

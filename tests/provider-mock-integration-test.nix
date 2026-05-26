@@ -67,19 +67,19 @@
         };
       };
 
-      services.healthchecksLite.canary = {
+      services.monitoringLite.canary = {
         enable = true;
         urlFile = "/etc/monitoring/canary.url";
         threshold = 100;
       };
 
-      services.healthchecksLite.systemdFail = {
+      services.monitoringLite.systemdFail = {
         enable = true;
         enableDemo = true;
         urlFile = "/etc/monitoring/systemd-failure.url";
       };
 
-      services.healthchecksLite.smartd = {
+      services.monitoringLite.smartd = {
         enable = true;
         testMode = true;
         urlFile = "/etc/monitoring/smartd.url";
@@ -101,30 +101,30 @@
     machine.wait_for_unit("monitoring-mock.service")
     machine.wait_until_succeeds("curl -fsS http://127.0.0.1:8080/health")
 
-    shellcheck_unit("healthchecks-lite-canary.service")
-    shellcheck_unit("healthchecks-lite-fail@healthchecks-lite-fail-demo.service")
-    shellcheck_unit("healthchecks-lite-systemd-fail-ok.service")
-    shellcheck_unit("healthchecks-lite-smartd-short-self-test.service")
-    shellcheck_unit("healthchecks-lite-smartd-test-alert.service")
-    shellcheck_unit("healthchecks-lite-smartd-ok.service")
+    shellcheck_unit("monitoring-lite-canary.service")
+    shellcheck_unit("monitoring-lite-fail@monitoring-lite-fail-demo.service")
+    shellcheck_unit("monitoring-lite-systemd-fail-ok.service")
+    shellcheck_unit("monitoring-lite-smartd-short-self-test.service")
+    shellcheck_unit("monitoring-lite-smartd-test-alert.service")
+    shellcheck_unit("monitoring-lite-smartd-ok.service")
 
-    machine.succeed("systemctl start healthchecks-lite-canary.service")
+    machine.succeed("systemctl start monitoring-lite-canary.service")
     machine.wait_until_succeeds("grep -F 'POST /canary' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Disk:' /tmp/monitoring-requests.log")
 
-    machine.fail("systemctl start healthchecks-lite-fail-demo.service")
+    machine.fail("systemctl start monitoring-lite-fail-demo.service")
     machine.wait_until_succeeds("grep -F 'POST /systemd-failure/fail' /tmp/monitoring-requests.log")
-    machine.succeed("grep -F 'Service healthchecks-lite-fail-demo.service failed' /tmp/monitoring-requests.log")
+    machine.succeed("grep -F 'Service monitoring-lite-fail-demo.service failed' /tmp/monitoring-requests.log")
 
-    machine.succeed("systemctl start healthchecks-lite-systemd-fail-ok.service")
+    machine.succeed("systemctl start monitoring-lite-systemd-fail-ok.service")
     machine.wait_until_succeeds("grep -F 'POST /systemd-failure' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'systemd failure path recovered' /tmp/monitoring-requests.log")
 
-    machine.succeed("systemctl start healthchecks-lite-smartd-test-alert.service")
+    machine.succeed("systemctl start monitoring-lite-smartd-test-alert.service")
     machine.wait_until_succeeds("grep -F 'POST /smartd/fail' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'SMARTD_DEVICE=/dev/test' /tmp/monitoring-requests.log")
 
-    machine.succeed("systemctl start healthchecks-lite-smartd-ok.service")
+    machine.succeed("systemctl start monitoring-lite-smartd-ok.service")
     machine.wait_until_succeeds("grep -F 'POST /smartd' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'SMART monitoring recovered' /tmp/monitoring-requests.log")
   '';
