@@ -14,11 +14,11 @@
       forLinuxSystems = lib.genAttrs linuxSystems;
       pkgsFor = system: import nixpkgs { inherit system; };
 
+      # Minimal dummy host config used only for NixOS eval checks.
       baseModule = {
         boot.loader.grub.enable = false;
         fileSystems."/".device = "none";
-        fileSystems."/".fsType = "ext4";
-        system.stateVersion = "25.05";
+        system.stateVersion = "25.11";
       };
 
       mkConfig =
@@ -53,8 +53,8 @@
           canaryConfig = mkConfig system [
             self.nixosModules.canary
             {
-              services.healthchecksLite.canary.enable = true;
-              services.healthchecksLite.canary.urlFile = "/run/secrets/hc-canary.url";
+              services.monitoringLite.canary.enable = true;
+              services.monitoringLite.canary.urlFile = "/run/secrets/hc-canary.url";
             }
           ];
           btrfsConfig = mkConfig system [
@@ -64,27 +64,27 @@
                 device = "none";
                 fsType = "btrfs";
               };
-              services.healthchecksLite.canary.enable = true;
-              services.healthchecksLite.canary.urlFile = "/run/secrets/hc-canary.url";
+              services.monitoringLite.canary.enable = true;
+              services.monitoringLite.canary.urlFile = "/run/secrets/hc-canary.url";
             }
           ];
           aggregateConfig = mkConfig system [
             self.nixosModules.default
             {
-              services.healthchecksLite.canary.enable = true;
-              services.healthchecksLite.canary.urlFile = "/run/secrets/hc-canary.url";
-              services.healthchecksLite.systemdFail.enable = true;
-              services.healthchecksLite.systemdFail.urlFile = "/run/secrets/hc-systemd.url";
-              services.healthchecksLite.smartd.enable = true;
-              services.healthchecksLite.smartd.urlFile = "/run/secrets/hc-smartd.url";
+              services.monitoringLite.canary.enable = true;
+              services.monitoringLite.canary.urlFile = "/run/secrets/hc-canary.url";
+              services.monitoringLite.systemdFail.enable = true;
+              services.monitoringLite.systemdFail.urlFile = "/run/secrets/hc-systemd.url";
+              services.monitoringLite.smartd.enable = true;
+              services.monitoringLite.smartd.urlFile = "/run/secrets/hc-smartd.url";
             }
           ];
           failConfig = mkConfig system [
             self.nixosModules.systemd-fail
             {
-              services.healthchecksLite.systemdFail.enable = true;
-              services.healthchecksLite.systemdFail.urlFile = "/run/secrets/hc-systemd.url";
-              services.healthchecksLite.systemdFail.services = [ "demo" ];
+              services.monitoringLite.systemdFail.enable = true;
+              services.monitoringLite.systemdFail.urlFile = "/run/secrets/hc-systemd.url";
+              services.monitoringLite.systemdFail.services = [ "demo" ];
             }
           ];
         in
@@ -95,8 +95,8 @@
             mkConfig system [
               self.nixosModules.smartd
               {
-                services.healthchecksLite.smartd.enable = true;
-                services.healthchecksLite.smartd.urlFile = "/run/secrets/hc-smartd.url";
+                services.monitoringLite.smartd.enable = true;
+                services.monitoringLite.smartd.urlFile = "/run/secrets/hc-smartd.url";
               }
             ]
           );
@@ -105,7 +105,7 @@
             pkgs.runCommand "canary-no-btrfs-progs"
               {
                 servicePath = lib.concatStringsSep " " (
-                  map toString canaryConfig.systemd.services.healthchecks-lite-canary.path
+                  map toString canaryConfig.systemd.services.monitoring-lite-canary.path
                 );
               }
               ''
@@ -121,7 +121,7 @@
             pkgs.runCommand "canary-btrfs-progs"
               {
                 servicePath = lib.concatStringsSep " " (
-                  map toString btrfsConfig.systemd.services.healthchecks-lite-canary.path
+                  map toString btrfsConfig.systemd.services.monitoring-lite-canary.path
                 );
               }
               ''

@@ -1,5 +1,5 @@
 { pkgs }:
-pkgs.writeShellScript "healthchecks-lite-send-notify.sh" ''
+pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
   set -euo pipefail
 
   provider=""
