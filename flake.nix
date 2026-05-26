@@ -87,6 +87,16 @@
               services.monitoringLite.systemdFail.services = [ "demo" ];
             }
           ];
+          failJournalConfig = mkConfig system [
+            self.nixosModules.systemd-fail
+            {
+              services.monitoringLite.systemdFail.enable = true;
+              services.monitoringLite.systemdFail.urlFile = "/run/secrets/hc-systemd.url";
+              services.monitoringLite.systemdFail.includeJournal = true;
+            }
+          ];
+          failScript = failConfig.systemd.services."monitoring-lite-fail@".script;
+          failJournalScript = failJournalConfig.systemd.services."monitoring-lite-fail@".script;
         in
         {
           canary = mkEvalCheck pkgs "canary-eval" canaryConfig;
@@ -133,6 +143,14 @@
                     ;;
                 esac
               '';
+          systemd-fail-no-journalctl = mkEvalCheck pkgs "systemd-fail-no-journalctl" (
+            assert !(lib.hasInfix "journalctl" failScript);
+            failConfig
+          );
+          systemd-fail-journalctl = mkEvalCheck pkgs "systemd-fail-journalctl" (
+            assert lib.hasInfix "journalctl" failJournalScript;
+            failJournalConfig
+          );
         }
         // {
           provider-mock-integration = import ./tests/provider-mock-integration-test.nix {

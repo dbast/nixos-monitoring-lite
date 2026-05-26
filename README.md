@@ -12,7 +12,7 @@ flowchart LR
     Canary[canary timer]
     Systemd[systemd OnFailure]
     Smartd[smartd alerts]
-    Sender[shared send-notify]
+    Sender[send-notify]
   end
 
   Canary --> Sender
@@ -20,14 +20,14 @@ flowchart LR
   Smartd --> Sender
 
   Sender --> Provider[Heartbeat provider<br/>Healthchecks.io]
-  Provider --> Alerts[Alert routing<br/>chat / push / email / webhooks]
+  Provider --> Alerts[Alert routing<br/>chat / push / email / ...]
 ```
 
 ## Architecture
 
 - Traditional Unix monitoring often relies on direct local mail delivery; this setup sends HTTP events to a remote state machine that handles state transitions and routes alerts to modern channels in real time.
 - On systemd-based hosts, `OnFailure` reuses systemd's native failure-event flow without changing service logic; failed backups, scrubs, replication jobs, or any other units can emit failure events over the same path.
-- The canary heartbeat proves the host is reachable and scheduled checks still run; disk usage, Btrfs/mdraid state, failed-unit logs, and SMART fields are triage context layered onto that core signal.
+- The canary heartbeat proves the host is reachable and scheduled checks still run; disk usage, Btrfs/mdraid state, optional failed-unit logs, and SMART fields are triage context layered onto that core signal.
 - Scope boundary: this project forwards high-value state transitions; it intentionally does not implement a scraper/metrics/dashboard monitoring stack.
 
 ## What It Monitors
@@ -127,6 +127,19 @@ sudo systemctl start monitoring-lite-fail-demo.service
 
 That runs the same `OnFailure` path used by real monitored services.
 
+By default, failure payloads include service identity, host name, systemd result fields, load average, available memory, and root filesystem usage. Journal excerpts are not sent unless explicitly enabled:
+
+```nix
+{
+  services.monitoringLite.systemdFail = {
+    includeJournal = true;
+    journalLines = 50;
+  };
+}
+```
+
+Only enable this for units whose logs are safe to leave the machine.
+
 ### Test `smartd`
 
 Enable SMART test mode:
@@ -184,7 +197,17 @@ Proxying is generic and optional. Point each module at any proxy URL:
 }
 ```
 
-If you choose Tor, provide your own NixOS Tor config and pass its `socks5h://...` URL here. Payloads can still reveal hostnames, service names, mount points, and log excerpts.
+If you choose Tor, provide your own NixOS Tor config and pass its `socks5h://...` URL here. Payload contents can still identify the host and workload.
+
+## Payload Privacy
+
+This project sends operational context to an external provider. Treat payloads as data leaving the machine, not as opaque heartbeat metadata.
+
+- `canary` payloads can include host reachability, mount points, disk usage, Btrfs state, and mdraid state.
+- `systemdFail` payloads include host name, failed unit name, systemd result fields, load average, memory availability, and root filesystem usage.
+- `systemdFail.includeJournal = true` additionally sends recent journal lines from the failed invocation. This is disabled by default because logs can contain paths, user data, tokens, request details, or application payloads.
+- `smartd` payloads include SMART device identifiers and `smartd` failure messages.
+- A proxy or Tor changes the network path, not the sensitivity of the payload body.
 
 ## Development
 

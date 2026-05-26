@@ -42,17 +42,6 @@ in
       description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
     };
 
-    curlTimeout = lib.mkOption {
-      type = lib.types.int;
-      default = 15;
-      description = "Maximum seconds curl may spend on a Healthchecks.io request.";
-    };
-
-    retryCount = lib.mkOption {
-      type = lib.types.int;
-      default = 5;
-      description = "curl retry count for Healthchecks.io requests.";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -174,8 +163,6 @@ in
           --status "$status" \
           --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
           --message "$msg" \
-          --timeout ${toString cfg.curlTimeout} \
-          --retries ${toString cfg.retryCount} \
           ${proxyArg}
       '';
     };

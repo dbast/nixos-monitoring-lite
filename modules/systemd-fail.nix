@@ -9,6 +9,12 @@ let
   cfg = config.services.monitoringLite.systemdFail;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
   proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
+  journalSnippet = lib.optionalString cfg.includeJournal ''
+    log_snip="$(journalctl _SYSTEMD_INVOCATION_ID="$MONITOR_INVOCATION_ID" -n ${toString cfg.journalLines} --no-pager --output=short-unix 2>/dev/null || true)"
+    msg="$msg
+    ---- Journal (failed invocation, ${toString cfg.journalLines} lines) ----
+    $log_snip"
+  '';
 in
 {
   options.services.monitoringLite.systemdFail = {
@@ -39,22 +45,16 @@ in
       description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
     };
 
-    curlTimeout = lib.mkOption {
-      type = lib.types.int;
-      default = 15;
-      description = "Maximum seconds curl may spend on a Healthchecks.io request.";
-    };
-
-    retryCount = lib.mkOption {
-      type = lib.types.int;
-      default = 5;
-      description = "curl retry count for Healthchecks.io requests.";
+    includeJournal = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Include recent journal output from the failed service invocation in the failure payload. This can leak application data.";
     };
 
     journalLines = lib.mkOption {
       type = lib.types.int;
       default = 50;
-      description = "Number of failed-invocation journal lines to include in the failure payload.";
+      description = "Number of failed-invocation journal lines to include when includeJournal is enabled.";
     };
 
     okMessage = lib.mkOption {
@@ -79,30 +79,26 @@ in
             pkgs.coreutils
             pkgs.curl
             pkgs.gnugrep
-            pkgs.systemd
-          ];
+          ]
+          ++ lib.optional cfg.includeJournal pkgs.systemd;
           script = ''
             set -euo pipefail
             loadavg="$(cut -d' ' -f1-3 /proc/loadavg)"
             mem_line="$(grep -i '^MemAvailable:' /proc/meminfo || true)"
             df_root="$(df -h / 2>/dev/null | tail -n +2 || true)"
-            log_snip="$(journalctl _SYSTEMD_INVOCATION_ID="$MONITOR_INVOCATION_ID" -n ${toString cfg.journalLines} --no-pager --output=short-unix 2>/dev/null || true)"
             msg="$(cat <<EOF
             Service $MONITOR_UNIT failed on ${config.networking.hostName} (Result=$MONITOR_SERVICE_RESULT ExitCode=$MONITOR_EXIT_CODE ExitStatus=$MONITOR_EXIT_STATUS InvocationID=$MONITOR_INVOCATION_ID)
             LoadAvg=$loadavg  $mem_line
             RootFS: $df_root
-            ---- Journal (failed invocation, ${toString cfg.journalLines} lines) ----
-            $log_snip
             EOF
             )"
+            ${journalSnippet}
 
             ${sendNotify} \
               --provider healthchecks \
               --status fail \
               --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
               --message "$msg" \
-              --timeout ${toString cfg.curlTimeout} \
-              --retries ${toString cfg.retryCount} \
               ${proxyArg}
           '';
         };
@@ -127,8 +123,6 @@ in
               --status ok \
               --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
               --message "$msg" \
-              --timeout ${toString cfg.curlTimeout} \
-              --retries ${toString cfg.retryCount} \
               ${proxyArg}
           '';
         };
