@@ -20,8 +20,6 @@ let
       --status fail \
       --url-file ${lib.escapeShellArg cfg.urlFile} \
       --message "$msg" \
-      --timeout ${toString cfg.curlTimeout} \
-      --retries ${toString cfg.retryCount} \
       ${proxyArg}
   '';
   shortSelfTestServices = lib.optionalAttrs cfg.shortSelfTest.enable {
@@ -100,18 +98,6 @@ in
       description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
     };
 
-    curlTimeout = lib.mkOption {
-      type = lib.types.int;
-      default = 15;
-      description = "Maximum seconds curl may spend on a Healthchecks.io request.";
-    };
-
-    retryCount = lib.mkOption {
-      type = lib.types.int;
-      default = 5;
-      description = "curl retry count for Healthchecks.io requests.";
-    };
-
     okMessage = lib.mkOption {
       type = lib.types.str;
       default = "SMART monitoring recovered";
@@ -176,8 +162,6 @@ in
               --status ok \
               --url-file ${lib.escapeShellArg cfg.urlFile} \
               --message "$msg" \
-              --timeout ${toString cfg.curlTimeout} \
-              --retries ${toString cfg.retryCount} \
             ${proxyArg}
           '';
         };

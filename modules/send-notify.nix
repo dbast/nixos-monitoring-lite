@@ -7,8 +7,6 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
   url_file=""
   message=""
   proxy=""
-  timeout="15"
-  retries="5"
   token_file=""
   auth_header=""
 
@@ -19,8 +17,6 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
       --url-file) url_file="$2"; shift 2 ;;
       --message) message="$2"; shift 2 ;;
       --proxy) proxy="$2"; shift 2 ;;
-      --timeout) timeout="$2"; shift 2 ;;
-      --retries) retries="$2"; shift 2 ;;
       --token-file) token_file="$2"; shift 2 ;;
       --auth-header) auth_header="$2"; shift 2 ;;
       *)
@@ -51,8 +47,8 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
 
   curl_args=(
     -fsS
-    -m "$timeout"
-    --retry "$retries"
+    -m 15
+    --retry 5
     -o /dev/null
   )
   if [ -n "$proxy" ]; then
