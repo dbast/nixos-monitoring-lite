@@ -1,7 +1,7 @@
 {
   description = "Lean Healthchecks.io monitoring modules for NixOS";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
   outputs =
     { self, nixpkgs }:
@@ -17,7 +17,10 @@
       # Minimal dummy host config used only for NixOS eval checks.
       baseModule = {
         boot.loader.grub.enable = false;
-        fileSystems."/".device = "none";
+        fileSystems."/" = {
+          device = "none";
+          fsType = "tmpfs";
+        };
         system.stateVersion = "25.11";
       };
 
