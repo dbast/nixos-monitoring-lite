@@ -8,6 +8,22 @@
 let
   cfg = config.services.monitoringLite.canary;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
+  extraContext = lib.mapAttrsToList (
+    name: context:
+    let
+      program = "monitoring-lite-canary-context-${lib.strings.sanitizeDerivationName name}";
+    in
+    {
+      inherit name program;
+      package = pkgs.writeShellApplication {
+        name = program;
+        runtimeInputs = context.runtimeInputs;
+        text = context.script;
+      };
+    }
+  ) cfg.extraContext;
+  extraContextNames = map (context: context.name) extraContext;
+  extraContextScripts = map (context: "${context.package}/bin/${context.program}") extraContext;
   btrfsMounts = lib.attrNames (
     lib.filterAttrs (_: fs: fs.fsType or null == "btrfs") config.fileSystems
   );
@@ -42,6 +58,30 @@ in
       description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
     };
 
+    extraContext = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            script = lib.mkOption {
+              type = lib.types.lines;
+              description = ''
+                Shell script that prints short additional canary payload context to stdout.
+                A non-zero exit status marks the canary as failed and adds a reason.
+              '';
+            };
+
+            runtimeInputs = lib.mkOption {
+              type = lib.types.listOf lib.types.package;
+              default = [ ];
+              description = "Packages added to PATH while running this context script.";
+            };
+          };
+        }
+      );
+      default = { };
+      description = "Additional named scripts that emit short host-specific canary context.";
+    };
+
   };
 
   config = lib.mkIf cfg.enable {
@@ -66,8 +106,11 @@ in
         disk_parts=()
         btrfs_parts=()
         mdraid_parts=()
+        context_parts=()
         disks=(${lib.escapeShellArgs cfg.disks})
         btrfs_mounts=(${lib.escapeShellArgs btrfsMounts})
+        extra_context_names=(${lib.escapeShellArgs extraContextNames})
+        extra_context_scripts=(${lib.escapeShellArgs extraContextScripts})
 
         for mp in "''${disks[@]}"; do
           if [ -d "$mp" ]; then
@@ -137,9 +180,35 @@ in
           done < /proc/mdstat
         fi
 
+        for idx in "''${!extra_context_names[@]}"; do
+          context_name="''${extra_context_names[$idx]}"
+          context_script="''${extra_context_scripts[$idx]}"
+
+          if context_output="$("$context_script" 2>&1)"; then
+            context_output="''${context_output//$'\r'/}"
+            context_output="''${context_output//$'\n'/; }"
+            if [ -z "$context_output" ]; then
+              context_output="<empty>"
+            fi
+            context_parts+=("$context_name:$context_output")
+          else
+            context_status=$?
+            fail=1
+            reasons+=("$context_name:context-failed($context_status)")
+            context_output="''${context_output//$'\r'/}"
+            context_output="''${context_output//$'\n'/; }"
+            if [ -n "$context_output" ]; then
+              context_parts+=("$context_name:failed:$context_output")
+            else
+              context_parts+=("$context_name:failed")
+            fi
+          fi
+        done
+
         disk_summary="''${disk_parts[*]}"
         btrfs_summary="''${btrfs_parts[*]}"
         mdraid_summary="''${mdraid_parts[*]}"
+        context_summary="''${context_parts[*]}"
         reason_summary="''${reasons[*]}"
 
         msg="Disk: $disk_summary"
@@ -148,6 +217,9 @@ in
         fi
         if [ -n "$mdraid_summary" ]; then
           msg="$msg | Mdraid: $mdraid_summary"
+        fi
+        if [ -n "$context_summary" ]; then
+          msg="$msg | Context: $context_summary"
         fi
         if [ -n "$reason_summary" ]; then
           msg="$msg | Reasons: $reason_summary"

@@ -48,7 +48,7 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
 
 ## Modules
 
-- `nixosModules.canary`: daily heartbeat with disk usage, Btrfs device health, and mdraid state context.
+- `nixosModules.canary`: daily heartbeat with disk usage, Btrfs device health, mdraid state context, and optional host-specific context snippets.
 - `nixosModules.systemd-fail`: attaches failure pings to selected systemd units through `OnFailure`.
 - `nixosModules.smartd`: forwards `smartd` alerts and can run standby-aware SMART short self-tests.
 - `nixosModules.default`: imports all modules; each feature still has its own `enable` option.
@@ -177,6 +177,41 @@ Customize the recovery payload text with:
 - `services.monitoringLite.systemdFail.okMessage`
 - `services.monitoringLite.smartd.okMessage`
 
+### Canary Extra Context
+
+Add small host-specific canary context with `services.monitoringLite.canary.extraContext` instead of baking service-specific logic into this module. Each entry is a named shell script that should emit one short line. Its stdout is appended to the canary payload under `Context:`; if it exits non-zero, the canary sends a failure ping.
+
+Use this as a lightweight triage-context escape hatch. It is not a metrics scraper, dashboard, or time-series database; use Prometheus or another metrics stack for rate queries and historical analysis.
+
+Prometheus text endpoints are a useful source for these snippets because many serious services expose them. The canary still only sends the current one-shot summary; it does not scrape, store, graph, or evaluate time-series data.
+
+Example Blocky Prometheus scrape:
+
+```nix
+{ pkgs, ... }:
+{
+  services.monitoringLite.canary.extraContext.blocky = {
+    runtimeInputs = [
+      pkgs.jq
+      pkgs.prom2json
+    ];
+    script = ''
+      prom2json http://127.0.0.1:4000/metrics | jq -r '
+        def metric($n): map(select(.name == $n)) | .[0].metrics;
+        def sumMetric($n): (metric($n) | map(.value | tonumber) | add) // 0;
+        def value($n): (metric($n)[0].value | tonumber) // 0;
+        def sumLabel($n; $k; $v):
+          (metric($n) | map(select(.labels[$k] == $v) | .value | tonumber) | add) // 0;
+
+        "version=\((metric("blocky_build_info")[0].labels.version) // "unknown") blocking=\(value("blocky_blocking_enabled")) queries=\(sumMetric("blocky_query_total")) blocked=\(sumLabel("blocky_response_total"; "response_type"; "BLOCKED")) cache_hits=\(value("blocky_cache_hits_total")) cache_misses=\(value("blocky_cache_misses_total")) errors=\(value("blocky_error_total")) failed_downloads=\(value("blocky_failed_downloads_total"))"
+      '
+    '';
+  };
+}
+```
+
+This emits context like `blocky:version=0.29.0 blocking=1 queries=18885 blocked=5205 cache_hits=34596 cache_misses=4339 errors=0 failed_downloads=8`. Adjust the endpoint and metric names to match your Blocky version/configuration.
+
 ## SMART Self-Tests
 
 `smartd` remains responsible for observing and reporting SMART failures. The optional short-self-test service only starts tests with `smartctl`; it does not decide whether SMART passed or failed.
@@ -203,7 +238,7 @@ If you choose Tor, provide your own NixOS Tor config and pass its `socks5h://...
 
 This project sends operational context to an external provider. Treat payloads as data leaving the machine, not as opaque heartbeat metadata.
 
-- `canary` payloads can include host reachability, mount points, disk usage, Btrfs state, and mdraid state.
+- `canary` payloads can include host reachability, mount points, disk usage, Btrfs state, mdraid state, and any configured `extraContext` output.
 - `systemdFail` payloads include host name, failed unit name, systemd result fields, load average, memory availability, and root filesystem usage.
 - `systemdFail.includeJournal = true` additionally sends recent journal lines from the failed invocation. This is disabled by default because logs can contain paths, user data, tokens, request details, or application payloads.
 - `smartd` payloads include SMART device identifiers and `smartd` failure messages.

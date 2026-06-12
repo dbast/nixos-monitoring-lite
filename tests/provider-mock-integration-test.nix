@@ -71,6 +71,9 @@
         enable = true;
         urlFile = "/etc/monitoring/canary.url";
         threshold = 100;
+        extraContext.mock.script = ''
+          printf 'mock=ok\n'
+        '';
       };
 
       services.monitoringLite.systemdFail = {
@@ -111,6 +114,7 @@
     machine.succeed("systemctl start monitoring-lite-canary.service")
     machine.wait_until_succeeds("grep -F 'POST /canary' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Disk:' /tmp/monitoring-requests.log")
+    machine.succeed("grep -F 'Context: mock:mock=ok' /tmp/monitoring-requests.log")
 
     machine.fail("systemctl start monitoring-lite-fail-demo.service")
     machine.wait_until_succeeds("grep -F 'POST /systemd-failure/fail' /tmp/monitoring-requests.log")
