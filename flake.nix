@@ -58,6 +58,9 @@
             {
               services.monitoringLite.canary.enable = true;
               services.monitoringLite.canary.urlFile = "/run/secrets/hc-canary.url";
+              services.monitoringLite.canary.extraContext.mock.script = ''
+                printf 'mock=ok\n'
+              '';
             }
           ];
           btrfsConfig = mkConfig system [
