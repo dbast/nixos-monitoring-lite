@@ -33,7 +33,7 @@ flowchart LR
 ## What It Monitors
 
 - `canary`: machine is running, internet egress works, and storage context indicates capacity/array/filesystem health.
-- `systemdFail`: backup/scrub/replication/other critical services notify on failure; no failure signal means those service paths are healthy.
+- `systemdFail`: selected backup/scrub/replication/other critical services notify when they enter failure; this is an event path, not a positive health check.
 - `smartd`: disk-hardware failures are surfaced quickly, covering the most critical hardware risk for data loss on NAS systems.
 
 The result is tiny local overhead with strong monitoring coverage for high-value failure modes.
@@ -57,8 +57,8 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
 
 ```nix
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-  inputs.nixos-monitoring-lite.url = "github:YOUR_GITHUB_USER/nixos-monitoring-lite";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+  inputs.nixos-monitoring-lite.url = "github:dbast/nixos-monitoring-lite";
   inputs.nixos-monitoring-lite.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { nixpkgs, nixos-monitoring-lite, ... }: {
@@ -97,13 +97,19 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
 
 Each `urlFile` contains a base provider ping URL.
 
+Use a distinct provider check and URL for each feature so their failure and recovery states do not collide. Treat these URLs as credentials and keep their files protected.
+
 - Plain file: `urlFile = "/etc/healthchecks/canary.url";`
 - sops-nix: `urlFile = config.sops.secrets.hcCanaryUrl.path;`
 - agenix: `urlFile = config.age.secrets.hcCanaryUrl.path;`
 
 The module only consumes filesystem paths, so it has no runtime dependency on sops-nix or agenix.
 
+`systemdFail.services` values are NixOS `systemd.services` attribute names such as `backup`, not full unit names such as `backup.service`.
+
 ## Operations
+
+Delivery uses bounded HTTP retries but no durable local queue. After an outage, rerun the relevant oneshot or recovery service if an event was not delivered.
 
 ### Test `systemdFail`
 
@@ -179,7 +185,7 @@ Customize the recovery payload text with:
 
 ### Canary Extra Context
 
-Add small host-specific canary context with `services.monitoringLite.canary.extraContext` instead of baking service-specific logic into this module. Each entry is a named shell script that should emit one short line. Its stdout is appended to the canary payload under `Context:`; if it exits non-zero, the canary sends a failure ping.
+Add small host-specific canary context with `services.monitoringLite.canary.extraContext` instead of baking service-specific logic into this module. Each entry is a named shell script that should emit one short line. Its combined stdout and stderr is appended to the canary payload under `Context:`; if it exits non-zero, the canary sends a failure ping.
 
 Use this as a lightweight triage-context escape hatch. It is not a metrics scraper, dashboard, or time-series database; use Prometheus or another metrics stack for rate queries and historical analysis.
 
