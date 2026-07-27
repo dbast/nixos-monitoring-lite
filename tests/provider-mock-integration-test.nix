@@ -13,12 +13,13 @@
       imports = [ self.nixosModules.default ];
 
       system.stateVersion = "25.11";
+      systemd.globalEnvironment.all_proxy = "http://127.0.0.1:8080";
       environment.systemPackages = [ pkgs.shellcheck ];
 
       environment.etc = {
-        "monitoring/canary.url".text = "http://127.0.0.1:8080/canary\n";
-        "monitoring/systemd-failure.url".text = "http://127.0.0.1:8080/systemd-failure\n";
-        "monitoring/smartd.url".text = "http://127.0.0.1:8080/smartd\n";
+        "monitoring/canary.url".text = "http://monitoring.invalid/canary\n";
+        "monitoring/systemd-failure.url".text = "http://monitoring.invalid/systemd-failure\n";
+        "monitoring/smartd.url".text = "http://monitoring.invalid/smartd\n";
         "monitoring-mock.py".source = pkgs.writeText "monitoring-mock.py" ''
           from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -101,8 +102,8 @@
     shellcheck_unit("monitoring-lite-smartd-ok.service")
 
     machine.succeed("systemctl start monitoring-lite-canary.service")
-    machine.wait_until_succeeds("grep -Fx 'POST /canary' /tmp/monitoring-requests.log")
-    machine.fail("grep -F 'POST /canary/fail' /tmp/monitoring-requests.log")
+    machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/canary' /tmp/monitoring-requests.log")
+    machine.fail("grep -F 'POST http://monitoring.invalid/canary/fail' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Nixpkgs: disabled' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Reboot: no' /tmp/monitoring-requests.log")
 
@@ -110,26 +111,26 @@
     machine.succeed("ln -s /different/initrd /different/kernel /different/kernel-modules /tmp/booted-system")
     machine.succeed("ln -sfn /tmp/booted-system /run/booted-system")
     machine.succeed("systemctl start monitoring-lite-canary.service")
-    machine.wait_until_succeeds("grep -F 'POST /canary/fail' /tmp/monitoring-requests.log")
+    machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/canary/fail' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Reboot: required' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'reboot-required' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Disk:' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Context: mock:mock=ok' /tmp/monitoring-requests.log")
 
     machine.fail("systemctl start monitoring-lite-fail-demo.service")
-    machine.wait_until_succeeds("grep -F 'POST /systemd-failure/fail' /tmp/monitoring-requests.log")
+    machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/systemd-failure/fail' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Service monitoring-lite-fail-demo.service failed' /tmp/monitoring-requests.log")
 
     machine.succeed("systemctl start monitoring-lite-systemd-fail-ok.service")
-    machine.wait_until_succeeds("grep -F 'POST /systemd-failure' /tmp/monitoring-requests.log")
+    machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/systemd-failure' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'systemd failure path recovered' /tmp/monitoring-requests.log")
 
     machine.succeed("systemctl start monitoring-lite-smartd-test-alert.service")
-    machine.wait_until_succeeds("grep -F 'POST /smartd/fail' /tmp/monitoring-requests.log")
+    machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/smartd/fail' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'SMARTD_DEVICE=/dev/test' /tmp/monitoring-requests.log")
 
     machine.succeed("systemctl start monitoring-lite-smartd-ok.service")
-    machine.wait_until_succeeds("grep -F 'POST /smartd' /tmp/monitoring-requests.log")
+    machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/smartd' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'SMART monitoring recovered' /tmp/monitoring-requests.log")
   '';
 }

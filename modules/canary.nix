@@ -27,7 +27,6 @@ let
   btrfsMounts = lib.attrNames (
     lib.filterAttrs (_: fs: fs.fsType or null == "btrfs") config.fileSystems
   );
-  proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
 in
 {
   options.services.monitoringLite.canary = {
@@ -55,13 +54,6 @@ in
       type = lib.types.str;
       default = "/etc/healthchecks/canary.url";
       description = "Path to a file containing the base Healthchecks.io ping URL (plain file, sops-nix path, or agenix path).";
-    };
-
-    proxy = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "socks5h://127.0.0.1:9050";
-      description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
     };
 
     extraContext = lib.mkOption {
@@ -247,8 +239,7 @@ in
           --provider healthchecks \
           --status "$notification_status" \
           --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
-          --message "$msg" \
-          ${proxyArg}
+          --message "$msg"
       '';
     };
 
