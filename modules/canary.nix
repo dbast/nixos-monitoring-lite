@@ -48,7 +48,7 @@ in
     nixpkgsMaxAgeDays = lib.mkOption {
       type = lib.types.ints.unsigned;
       default = 30;
-      description = "Maximum age in days of the running generation's nixpkgs snapshot.";
+      description = "Maximum age in days of the running generation's nixpkgs snapshot. Set to 0 to disable this check.";
     };
 
     urlFile = lib.mkOption {
@@ -120,23 +120,39 @@ in
         extra_context_names=(${lib.escapeShellArgs extraContextNames})
         extra_context_scripts=(${lib.escapeShellArgs extraContextScripts})
 
-        nixpkgs_date="''${nixos_version#*.*.}"
-        nixpkgs_date="''${nixpkgs_date%%.*}"
-        if nixpkgs_epoch="$(date -u -d "$nixpkgs_date" +%s 2>/dev/null)"; then
-          now_epoch="$(date -u +%s)"
-          nixpkgs_age_days=$(( (now_epoch - nixpkgs_epoch) / 86400 ))
-          nixpkgs_summary="$nixpkgs_date:''${nixpkgs_age_days}d"
-          if [ "$nixpkgs_epoch" -gt "$now_epoch" ]; then
-            fail=1
-            reasons+=("nixpkgs-date-in-future($nixpkgs_date)")
-          elif [ "$nixpkgs_age_days" -gt "$nixpkgs_max_age_days" ]; then
-            fail=1
-            reasons+=("nixpkgs>''${nixpkgs_max_age_days}d(''${nixpkgs_age_days}d)")
+        nixpkgs_summary="disabled"
+        if [ "$nixpkgs_max_age_days" -ne 0 ]; then
+          nixpkgs_date="''${nixos_version#*.*.}"
+          nixpkgs_date="''${nixpkgs_date%%.*}"
+          if nixpkgs_epoch="$(date -u -d "$nixpkgs_date" +%s 2>/dev/null)"; then
+            now_epoch="$(date -u +%s)"
+            nixpkgs_age_days=$(( (now_epoch - nixpkgs_epoch) / 86400 ))
+            nixpkgs_summary="$nixpkgs_date:''${nixpkgs_age_days}d"
+            if [ "$nixpkgs_epoch" -gt "$now_epoch" ]; then
+              fail=1
+              reasons+=("nixpkgs-date-in-future($nixpkgs_date)")
+            elif [ "$nixpkgs_age_days" -gt "$nixpkgs_max_age_days" ]; then
+              fail=1
+              reasons+=("nixpkgs>''${nixpkgs_max_age_days}d(''${nixpkgs_age_days}d)")
+            fi
+          else
+            nixpkgs_summary="unknown:$nixos_version"
           fi
-        else
-          nixpkgs_summary="unknown:$nixos_version"
-          fail=1
-          reasons+=("nixpkgs-age-unknown")
+        fi
+
+        target_system=/nix/var/nix/profiles/system
+        if [ ! -e "$target_system" ]; then
+          target_system=/run/current-system
+        fi
+        reboot_summary="unknown"
+        if booted="$(readlink /run/booted-system/{initrd,kernel,kernel-modules} 2>/dev/null)" \
+          && target="$(readlink "$target_system"/{initrd,kernel,kernel-modules} 2>/dev/null)"; then
+          reboot_summary="no"
+          if [ "$booted" != "$target" ]; then
+            reboot_summary="required"
+            fail=1
+            reasons+=("reboot-required")
+          fi
         fi
 
         for mp in "''${disks[@]}"; do
@@ -238,7 +254,7 @@ in
         context_summary="''${context_parts[*]}"
         reason_summary="''${reasons[*]}"
 
-        msg="Nixpkgs: $nixpkgs_summary | Disk: $disk_summary"
+        msg="Nixpkgs: $nixpkgs_summary | Reboot: $reboot_summary | Disk: $disk_summary"
         if [ -n "$btrfs_summary" ]; then
           msg="$msg | Btrfs: $btrfs_summary"
         fi

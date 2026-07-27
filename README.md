@@ -27,12 +27,12 @@ flowchart LR
 
 - Traditional Unix monitoring often relies on direct local mail delivery; this setup sends HTTP events to a remote state machine that handles state transitions and routes alerts to modern channels in real time.
 - On systemd-based hosts, `OnFailure` reuses systemd's native failure-event flow without changing service logic; failed backups, scrubs, replication jobs, or any other units can emit failure events over the same path.
-- The canary heartbeat proves the host is reachable and scheduled checks still run; nixpkgs age, disk usage, Btrfs/mdraid state, optional failed-unit logs, and SMART fields are triage context layered onto that core signal.
+- The canary heartbeat proves the host is reachable and scheduled checks still run; nixpkgs age, pending reboot state, disk usage, Btrfs/mdraid state, optional failed-unit logs, and SMART fields are triage context layered onto that core signal.
 - Scope boundary: this project forwards high-value state transitions; it intentionally does not implement a scraper/metrics/dashboard monitoring stack.
 
 ## What It Monitors
 
-- `canary`: machine is running, internet egress works, the nixpkgs snapshot is recent, and storage context indicates capacity/array/filesystem health.
+- `canary`: machine is running, internet egress works, the nixpkgs snapshot is recent, no kernel/initrd/modules reboot is pending, and storage context indicates capacity/array/filesystem health.
 - `systemdFail`: selected backup/scrub/replication/other critical services notify when they enter failure; this is an event path, not a positive health check.
 - `smartd`: disk-hardware failures are surfaced quickly, covering the most critical hardware risk for data loss on NAS systems.
 
@@ -48,7 +48,7 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
 
 ## Modules
 
-- `nixosModules.canary`: daily heartbeat with nixpkgs snapshot age, disk usage, Btrfs device health, mdraid state context, and optional host-specific context snippets.
+- `nixosModules.canary`: daily heartbeat with nixpkgs snapshot age, pending reboot state, disk usage, Btrfs device health, mdraid state context, and optional host-specific context snippets.
 - `nixosModules.systemd-fail`: attaches failure pings to selected systemd units through `OnFailure`.
 - `nixosModules.smartd`: forwards `smartd` alerts and can run standby-aware SMART short self-tests.
 - `nixosModules.default`: imports all modules; each feature still has its own `enable` option.
@@ -111,6 +111,10 @@ The module only consumes filesystem paths, so it has no runtime dependency on so
 ## Operations
 
 Delivery uses bounded HTTP retries but no durable local queue. After an outage, rerun the relevant oneshot or recovery service if an event was not delivered.
+
+Host-only nixpkgs-age and reboot signals are reported as `unknown` without failing the canary when unavailable, such as in NixOS integration tests or containers. Known stale snapshots and pending reboots still send failure pings.
+
+Set `services.monitoringLite.canary.nixpkgsMaxAgeDays = 0` to disable the nixpkgs-age check, for example in an end-to-end test configuration.
 
 ### Test `systemdFail`
 

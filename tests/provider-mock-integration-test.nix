@@ -13,7 +13,6 @@
       imports = [ self.nixosModules.default ];
 
       system.stateVersion = "25.11";
-      system.nixos.versionSuffix = ".20000101.test";
       virtualisation.memorySize = 1024;
       environment.systemPackages = [
         pkgs.curl
@@ -72,6 +71,7 @@
         enable = true;
         urlFile = "/etc/monitoring/canary.url";
         threshold = 100;
+        nixpkgsMaxAgeDays = 0;
         extraContext.mock.script = ''
           printf 'mock=ok\n'
         '';
@@ -113,9 +113,18 @@
     shellcheck_unit("monitoring-lite-smartd-ok.service")
 
     machine.succeed("systemctl start monitoring-lite-canary.service")
+    machine.wait_until_succeeds("grep -Fx 'POST /canary' /tmp/monitoring-requests.log")
+    machine.fail("grep -F 'POST /canary/fail' /tmp/monitoring-requests.log")
+    machine.succeed("grep -F 'Nixpkgs: disabled' /tmp/monitoring-requests.log")
+    machine.succeed("grep -F 'Reboot: no' /tmp/monitoring-requests.log")
+
+    machine.succeed("mkdir /tmp/booted-system")
+    machine.succeed("ln -s /different/initrd /different/kernel /different/kernel-modules /tmp/booted-system")
+    machine.succeed("ln -sfn /tmp/booted-system /run/booted-system")
+    machine.succeed("systemctl start monitoring-lite-canary.service")
     machine.wait_until_succeeds("grep -F 'POST /canary/fail' /tmp/monitoring-requests.log")
-    machine.succeed("grep -F 'Nixpkgs: 20000101:' /tmp/monitoring-requests.log")
-    machine.succeed("grep -F 'nixpkgs>30d' /tmp/monitoring-requests.log")
+    machine.succeed("grep -F 'Reboot: required' /tmp/monitoring-requests.log")
+    machine.succeed("grep -F 'reboot-required' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Disk:' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'Context: mock:mock=ok' /tmp/monitoring-requests.log")
 
