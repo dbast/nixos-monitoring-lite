@@ -77,7 +77,6 @@ in
           };
           path = [
             pkgs.coreutils
-            pkgs.curl
             pkgs.gnugrep
           ]
           ++ lib.optional cfg.includeJournal pkgs.systemd;
@@ -113,7 +112,6 @@ in
           };
           path = [
             pkgs.coreutils
-            pkgs.curl
           ];
           script = ''
             set -euo pipefail
