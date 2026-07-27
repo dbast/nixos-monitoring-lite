@@ -233,17 +233,15 @@ The short-self-test invocation remains standby-aware (`smartctl -n standby`), so
 
 ## Optional Proxy Egress
 
-Proxying is generic and optional. Point each module at any proxy URL:
+Use systemd's native service environment for optional proxy egress:
 
 ```nix
 {
-  services.monitoringLite.canary.proxy = "http://proxy.example:3128";
-  services.monitoringLite.systemdFail.proxy = "http://proxy.example:3128";
-  services.monitoringLite.smartd.proxy = "http://proxy.example:3128";
+  systemd.globalEnvironment.all_proxy = "socks5h://127.0.0.1:9050";
 }
 ```
 
-If you choose Tor, provide your own NixOS Tor config and pass its `socks5h://...` URL here. Payload contents can still identify the host and workload.
+This applies to all system services. Set `systemd.services.<name>.environment.https_proxy` instead when only a specific monitoring service should use the proxy. Payload contents can still identify the host and workload.
 
 ## Payload Privacy
 

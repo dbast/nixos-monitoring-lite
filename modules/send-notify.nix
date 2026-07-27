@@ -6,7 +6,6 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
   status=""
   url_file=""
   message=""
-  proxy=""
   token_file=""
   auth_header=""
 
@@ -16,7 +15,6 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
       --status) status="$2"; shift 2 ;;
       --url-file) url_file="$2"; shift 2 ;;
       --message) message="$2"; shift 2 ;;
-      --proxy) proxy="$2"; shift 2 ;;
       --token-file) token_file="$2"; shift 2 ;;
       --auth-header) auth_header="$2"; shift 2 ;;
       *)
@@ -51,9 +49,6 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
     --retry 5
     -o /dev/null
   )
-  if [ -n "$proxy" ]; then
-    curl_args+=(--proxy "$proxy")
-  fi
   if [ -n "$auth_header" ] && [ -n "$token_file" ]; then
     token="$(${pkgs.coreutils}/bin/cat "$token_file")"
     curl_args+=(-H "$auth_header: $token")

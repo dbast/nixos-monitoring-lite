@@ -8,7 +8,6 @@
 let
   cfg = config.services.monitoringLite.systemdFail;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
-  proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
   journalSnippet = lib.optionalString cfg.includeJournal ''
     log_snip="$(journalctl _SYSTEMD_INVOCATION_ID="$MONITOR_INVOCATION_ID" -n ${toString cfg.journalLines} --no-pager --output=short-unix 2>/dev/null || true)"
     msg="$msg
@@ -36,13 +35,6 @@ in
       type = lib.types.bool;
       default = false;
       description = "Enable an intentionally failing demo service for testing failure notifications.";
-    };
-
-    proxy = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "socks5h://127.0.0.1:9050";
-      description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
     };
 
     includeJournal = lib.mkOption {
@@ -97,8 +89,7 @@ in
               --provider healthchecks \
               --status fail \
               --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
-              --message "$msg" \
-              ${proxyArg}
+              --message "$msg"
           '';
         };
 
@@ -120,8 +111,7 @@ in
               --provider healthchecks \
               --status ok \
               --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
-              --message "$msg" \
-              ${proxyArg}
+              --message "$msg"
           '';
         };
       }

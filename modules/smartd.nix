@@ -8,7 +8,6 @@
 let
   cfg = config.services.monitoringLite.smartd;
   sendNotify = import ./send-notify.nix { inherit pkgs; };
-  proxyArg = if cfg.proxy != null then "--proxy ${lib.escapeShellArg cfg.proxy}" else "";
   smartdHook = pkgs.writeShellScript "smartd-monitoring-lite.sh" ''
     set -euo pipefail
     msg="SMARTD_DEVICE=$SMARTD_DEVICE
@@ -19,8 +18,7 @@ let
       --provider healthchecks \
       --status fail \
       --url-file ${lib.escapeShellArg cfg.urlFile} \
-      --message "$msg" \
-      ${proxyArg}
+      --message "$msg"
   '';
   shortSelfTestServices = lib.optionalAttrs cfg.shortSelfTest.enable {
     monitoring-lite-smartd-short-self-test = {
@@ -91,13 +89,6 @@ in
 
     testMode = lib.mkEnableOption "sending a test SMART alert on smartd startup";
 
-    proxy = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "socks5h://127.0.0.1:9050";
-      description = "Optional curl proxy URL. Set this to a local Tor SOCKS proxy if desired.";
-    };
-
     okMessage = lib.mkOption {
       type = lib.types.str;
       default = "SMART monitoring recovered";
@@ -160,8 +151,7 @@ in
               --provider healthchecks \
               --status ok \
               --url-file ${lib.escapeShellArg cfg.urlFile} \
-              --message "$msg" \
-            ${proxyArg}
+              --message "$msg"
           '';
         };
         monitoring-lite-smartd-test-alert = lib.mkIf cfg.testMode {
