@@ -152,7 +152,6 @@ in
           serviceConfig.Type = "oneshot";
           path = [
             pkgs.coreutils
-            pkgs.curl
           ];
           script = ''
             set -euo pipefail

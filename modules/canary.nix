@@ -101,7 +101,6 @@ in
       };
       path = [
         pkgs.coreutils
-        pkgs.curl
       ]
       ++ lib.optionals (btrfsMounts != [ ]) [ pkgs.btrfs-progs ];
       script = ''
@@ -109,7 +108,7 @@ in
         threshold=${toString cfg.threshold}
         nixpkgs_max_age_days=${toString cfg.nixpkgsMaxAgeDays}
         nixos_version=${lib.escapeShellArg config.system.nixos.version}
-        fail=0
+        notification_status="ok"
         reasons=()
         disk_parts=()
         btrfs_parts=()
@@ -120,6 +119,11 @@ in
         extra_context_names=(${lib.escapeShellArgs extraContextNames})
         extra_context_scripts=(${lib.escapeShellArgs extraContextScripts})
 
+        mark_failed() {
+          notification_status="fail"
+          reasons+=("$1")
+        }
+
         nixpkgs_summary="disabled"
         if [ "$nixpkgs_max_age_days" -ne 0 ]; then
           nixpkgs_date="''${nixos_version#*.*.}"
@@ -129,11 +133,9 @@ in
             nixpkgs_age_days=$(( (now_epoch - nixpkgs_epoch) / 86400 ))
             nixpkgs_summary="$nixpkgs_date:''${nixpkgs_age_days}d"
             if [ "$nixpkgs_epoch" -gt "$now_epoch" ]; then
-              fail=1
-              reasons+=("nixpkgs-date-in-future($nixpkgs_date)")
+              mark_failed "nixpkgs-date-in-future($nixpkgs_date)"
             elif [ "$nixpkgs_age_days" -gt "$nixpkgs_max_age_days" ]; then
-              fail=1
-              reasons+=("nixpkgs>''${nixpkgs_max_age_days}d(''${nixpkgs_age_days}d)")
+              mark_failed "nixpkgs>''${nixpkgs_max_age_days}d(''${nixpkgs_age_days}d)"
             fi
           else
             nixpkgs_summary="unknown:$nixos_version"
@@ -150,8 +152,7 @@ in
           reboot_summary="no"
           if [ "$booted" != "$target" ]; then
             reboot_summary="required"
-            fail=1
-            reasons+=("reboot-required")
+            mark_failed "reboot-required"
           fi
         fi
 
@@ -160,8 +161,7 @@ in
             pct="$(df --output=pcent "$mp" 2>/dev/null | tail -n 1 | tr -d '% ' || echo '?')"
             disk_parts+=("$(basename "$mp"):$pct%")
             if [ "$pct" != "?" ] && [ "$pct" -gt "$threshold" ]; then
-              fail=1
-              reasons+=("$mp>$threshold%($pct%)")
+              mark_failed "$mp>$threshold%($pct%)"
             fi
           fi
         done
@@ -170,58 +170,40 @@ in
           if [ -d "$mp" ]; then
             status="ok"
             if ! fs_show="$(btrfs filesystem show "$mp" 2>&1)"; then
-              fail=1
               status="show-failed"
-              reasons+=("$mp:btrfs-show-failed")
+              mark_failed "$mp:btrfs-show-failed"
             else
               case "$fs_show" in
                 *missing*|*MISSING*)
-                  fail=1
                   status="missing-device"
-                  reasons+=("$mp:btrfs-missing-device")
+                  mark_failed "$mp:btrfs-missing-device"
                   ;;
               esac
             fi
 
             if ! btrfs device stats -c "$mp" >/dev/null 2>&1; then
-              fail=1
               if [ "$status" = "ok" ]; then
                 status="device-errors"
               else
                 status="$status+device-errors"
               fi
-              reasons+=("$mp:btrfs-device-errors")
+              mark_failed "$mp:btrfs-device-errors"
             fi
 
             btrfs_parts+=("$(basename "$mp"):$status")
           fi
         done
 
-        if [ -r /proc/mdstat ]; then
-          current_array=""
-          while IFS= read -r line; do
-            case "$line" in
-              md*" :"*)
-                current_array="''${line%% *}"
-                mdraid_parts+=("$current_array:present")
-                ;;
-              *"["*"]"*)
-                if [ -n "$current_array" ]; then
-                  raid_state="''${line##*[}"
-                  raid_state="[''${raid_state%%]*}]"
-                  last_idx=$(( ''${#mdraid_parts[@]} - 1 ))
-                  mdraid_parts[last_idx]="$current_array:$raid_state"
-                  case "$raid_state" in
-                    *_*)
-                      fail=1
-                      reasons+=("$current_array:mdraid-degraded")
-                      ;;
-                  esac
-                fi
-                ;;
-            esac
-          done < /proc/mdstat
-        fi
+        for degraded_file in /sys/block/md*/md/degraded; do
+          [ -e "$degraded_file" ] || continue
+          array="''${degraded_file#/sys/block/}"
+          array="''${array%%/*}"
+          degraded="$(<"$degraded_file")"
+          mdraid_parts+=("$array:degraded=$degraded")
+          if [ "$degraded" -gt 0 ]; then
+            mark_failed "$array:mdraid-degraded($degraded)"
+          fi
+        done
 
         for idx in "''${!extra_context_names[@]}"; do
           context_name="''${extra_context_names[$idx]}"
@@ -236,8 +218,7 @@ in
             context_parts+=("$context_name:$context_output")
           else
             context_status=$?
-            fail=1
-            reasons+=("$context_name:context-failed($context_status)")
+            mark_failed "$context_name:context-failed($context_status)"
             context_output="''${context_output//$'\r'/}"
             context_output="''${context_output//$'\n'/; }"
             if [ -n "$context_output" ]; then
@@ -248,34 +229,23 @@ in
           fi
         done
 
-        disk_summary="''${disk_parts[*]}"
-        btrfs_summary="''${btrfs_parts[*]}"
-        mdraid_summary="''${mdraid_parts[*]}"
-        context_summary="''${context_parts[*]}"
-        reason_summary="''${reasons[*]}"
-
-        msg="Nixpkgs: $nixpkgs_summary | Reboot: $reboot_summary | Disk: $disk_summary"
-        if [ -n "$btrfs_summary" ]; then
-          msg="$msg | Btrfs: $btrfs_summary"
+        msg="Nixpkgs: $nixpkgs_summary | Reboot: $reboot_summary | Disk: ''${disk_parts[*]}"
+        if [ "''${#btrfs_parts[@]}" -gt 0 ]; then
+          msg+=" | Btrfs: ''${btrfs_parts[*]}"
         fi
-        if [ -n "$mdraid_summary" ]; then
-          msg="$msg | Mdraid: $mdraid_summary"
+        if [ "''${#mdraid_parts[@]}" -gt 0 ]; then
+          msg+=" | Mdraid: ''${mdraid_parts[*]}"
         fi
-        if [ -n "$context_summary" ]; then
-          msg="$msg | Context: $context_summary"
+        if [ "''${#context_parts[@]}" -gt 0 ]; then
+          msg+=" | Context: ''${context_parts[*]}"
         fi
-        if [ -n "$reason_summary" ]; then
-          msg="$msg | Reasons: $reason_summary"
-        fi
-
-        status="ok"
-        if [ "$fail" -eq 1 ]; then
-          status="fail"
+        if [ "''${#reasons[@]}" -gt 0 ]; then
+          msg+=" | Reasons: ''${reasons[*]}"
         fi
 
         ${sendNotify} \
           --provider healthchecks \
-          --status "$status" \
+          --status "$notification_status" \
           --url-file "$CREDENTIALS_DIRECTORY/HC_URL" \
           --message "$msg" \
           ${proxyArg}

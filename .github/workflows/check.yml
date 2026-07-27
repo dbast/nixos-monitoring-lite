@@ -17,8 +17,6 @@ jobs:
             github:NixOS/nixpkgs/${NIXPKGS_REF}#treefmt \
             github:NixOS/nixpkgs/${NIXPKGS_REF}#nixfmt \
             github:NixOS/nixpkgs/${NIXPKGS_REF}#deadnix \
-            github:NixOS/nixpkgs/${NIXPKGS_REF}#shfmt \
-            github:NixOS/nixpkgs/${NIXPKGS_REF}#shellcheck \
             github:NixOS/nixpkgs/${NIXPKGS_REF}#yamlfmt \
             github:NixOS/nixpkgs/${NIXPKGS_REF}#typos \
             -c treefmt --ci

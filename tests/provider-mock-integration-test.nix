@@ -13,11 +13,7 @@
       imports = [ self.nixosModules.default ];
 
       system.stateVersion = "25.11";
-      virtualisation.memorySize = 1024;
-      environment.systemPackages = [
-        pkgs.curl
-        pkgs.shellcheck
-      ];
+      environment.systemPackages = [ pkgs.shellcheck ];
 
       environment.etc = {
         "monitoring/canary.url".text = "http://127.0.0.1:8080/canary\n";
@@ -39,14 +35,6 @@
                   self.send_response(200)
                   self.end_headers()
                   self.wfile.write(b"ok\n")
-
-              def do_GET(self):
-                  if self.path == "/health":
-                      self.send_response(200)
-                      self.end_headers()
-                      self.wfile.write(b"ok\n")
-                  else:
-                      self._record()
 
               def do_POST(self):
                   self._record()
@@ -103,7 +91,7 @@
 
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("monitoring-mock.service")
-    machine.wait_until_succeeds("curl -fsS http://127.0.0.1:8080/health")
+    machine.wait_for_open_port(8080)
 
     shellcheck_unit("monitoring-lite-canary.service")
     shellcheck_unit("monitoring-lite-fail@monitoring-lite-fail-demo.service")
