@@ -61,12 +61,14 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
   inputs.nixos-monitoring-lite.url = "github:dbast/nixos-monitoring-lite";
   inputs.nixos-monitoring-lite.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { nixpkgs, nixos-monitoring-lite, ... }: {
+  outputs = { self, nixpkgs, nixos-monitoring-lite, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         nixos-monitoring-lite.nixosModules.default
         {
+          system.configurationRevision = self.sourceInfo.rev or null;
+
           services.monitoringLite.canary = {
             enable = true;
             urlFile = "/run/secrets/healthchecks/canary.url";
@@ -97,6 +99,10 @@ Healthchecks.io fits this model well: it listens for HTTP pings, stays quiet whi
 ```
 
 Each `urlFile` contains a base provider ping URL.
+
+Every payload, including recovery pings, ends with `NixOS: ` followed by the complete output of `nixos-version --json`. This currently identifies the running `nixosVersion`, `nixpkgsRevision`, and, when configured, `configurationRevision`.
+
+`configurationRevision` identifies the top-level configuration repository rather than nixpkgs. NixOS leaves it unset unless your configuration supplies `system.configurationRevision`; for a flake, use `self.sourceInfo.rev or null` as shown above. Build from a clean committed Git revision so `self.sourceInfo.rev` exists. When the value is `null`, `nixos-version --json` omits `configurationRevision`.
 
 Use a distinct provider check and URL for each feature so their failure and recovery states do not collide. Treat these URLs as credentials and keep their files protected.
 
@@ -251,6 +257,7 @@ This project sends operational context to an external provider. Treat payloads a
 - `systemdFail` payloads include host name, failed unit name, systemd result fields, load average, memory availability, and root filesystem usage.
 - `systemdFail.includeJournal = true` additionally sends recent journal lines from the failed invocation. This is disabled by default because logs can contain paths, user data, tokens, request details, or application payloads.
 - `smartd` payloads include SMART device identifiers and `smartd` failure messages.
+- All payloads include the full `nixos-version --json` output, which can expose nixpkgs and configuration Git revisions.
 - A proxy or Tor changes the network path, not the sensitivity of the payload body.
 
 ## Development

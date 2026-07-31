@@ -13,6 +13,7 @@
       imports = [ self.nixosModules.default ];
 
       system.stateVersion = "25.11";
+      system.configurationRevision = "monitoring-lite-integration-test";
       systemd.globalEnvironment.all_proxy = "http://127.0.0.1:8080";
       environment.systemPackages = [ pkgs.shellcheck ];
 
@@ -93,6 +94,8 @@
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("monitoring-mock.service")
     machine.wait_for_open_port(8080)
+    expected_version_json = machine.succeed("nixos-version --json").strip()
+    assert '"configurationRevision":"monitoring-lite-integration-test"' in expected_version_json
 
     shellcheck_unit("monitoring-lite-canary.service")
     shellcheck_unit("monitoring-lite-fail@monitoring-lite-fail-demo.service")
@@ -132,5 +135,11 @@
     machine.succeed("systemctl start monitoring-lite-smartd-ok.service")
     machine.wait_until_succeeds("grep -Fx 'POST http://monitoring.invalid/smartd' /tmp/monitoring-requests.log")
     machine.succeed("grep -F 'SMART monitoring recovered' /tmp/monitoring-requests.log")
+
+    requests = machine.succeed("cat /tmp/monitoring-requests.log").split("\n---\n")
+    requests = [request for request in requests if request.strip()]
+    assert requests
+    for request in requests:
+        assert expected_version_json in request, request
   '';
 }

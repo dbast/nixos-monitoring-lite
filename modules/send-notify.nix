@@ -54,5 +54,10 @@ pkgs.writeShellScript "monitoring-lite-send-notify.sh" ''
     curl_args+=(-H "$auth_header: $token")
   fi
 
+  nixos_version_json="$(/run/current-system/sw/bin/nixos-version --json 2>/dev/null)" \
+    || nixos_version_json='{"error":"nixos-version --json failed"}'
+  message="$message
+  NixOS: $nixos_version_json"
+
   ${pkgs.curl}/bin/curl "''${curl_args[@]}" --data-raw "$message" "$url"
 ''
