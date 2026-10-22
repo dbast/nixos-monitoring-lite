@@ -2,7 +2,6 @@
 
 [![Release](https://img.shields.io/github/v/release/dbast/nixos-monitoring-lite?display_name=tag&sort=semver)](https://github.com/dbast/nixos-monitoring-lite/releases/latest)
 [![check](https://github.com/dbast/nixos-monitoring-lite/actions/workflows/check.yml/badge.svg)](https://github.com/dbast/nixos-monitoring-lite/actions/workflows/check.yml)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dbast/nixos-monitoring-lite)
 
 Tiny event-forwarding monitoring for NixOS hosts and NAS systems.
 
