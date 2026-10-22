@@ -6,7 +6,8 @@
     "helpers:pinGitHubActionDigests"
   ],
   "lockFileMaintenance": {
-    "enabled": true
+    "enabled": true,
+    "schedule": ["* * 17 * *"]
   },
   "nix": {
     "enabled": true
